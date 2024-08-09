@@ -7,11 +7,32 @@ class TimerPage extends StatefulWidget {
   TimerPageState createState() => TimerPageState();
 }
 
-class TimerPageState extends State<TimerPage> {
+class TimerPageState extends State<TimerPage> with TickerProviderStateMixin {
   int _remainingSeconds = 0;
+  int _totalSeconds = 0;
   bool _isRunning = false;
   bool _isPaused = false;
   TextEditingController controller = TextEditingController();
+  late AnimationController _progressController;
+  late Animation<double> _progressAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 0),
+    );
+    _progressAnimation =
+        Tween<double>(begin: 1.0, end: 0.0).animate(_progressController);
+  }
+
+  @override
+  void dispose() {
+    _progressController.dispose();
+    controller.dispose();
+    super.dispose();
+  }
 
   void _startTimer() async {
     setState(() {
@@ -19,6 +40,10 @@ class TimerPageState extends State<TimerPage> {
       _isPaused = false;
       if (_remainingSeconds == 0) {
         _remainingSeconds = int.tryParse(controller.text) ?? 0;
+        _totalSeconds = _remainingSeconds;
+        _progressController.duration = Duration(seconds: _totalSeconds);
+        _progressController.reset();
+        _progressController.forward();
       }
     });
 
@@ -43,6 +68,7 @@ class TimerPageState extends State<TimerPage> {
     setState(() {
       _isPaused = true;
       _isRunning = false;
+      _progressController.stop();
     });
   }
 
@@ -50,6 +76,7 @@ class TimerPageState extends State<TimerPage> {
     setState(() {
       _isPaused = false;
       _isRunning = true;
+      _progressController.forward();
     });
     _startTimer();
   }
@@ -59,7 +86,9 @@ class TimerPageState extends State<TimerPage> {
       _isRunning = false;
       _isPaused = false;
       _remainingSeconds = 0;
+      _totalSeconds = 0;
       controller.clear();
+      _progressController.reset();
     });
   }
 
@@ -111,12 +140,27 @@ class TimerPageState extends State<TimerPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'Verbleibende Zeit: ${_formatTime(_remainingSeconds)}',
-              style: const TextStyle(fontSize: 40),
+            const SizedBox(height: 40),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  height: 200, // Größere Höhe des Kreises
+                  width: 200, // Größere Breite des Kreises
+                  child: CircularProgressIndicator(
+                    value: _progressAnimation.value,
+                    strokeWidth: 15, // Dickere Kreislinie
+                    backgroundColor: Colors.grey.shade300,
+                  ),
+                ),
+                Text(
+                  _formatTime(_remainingSeconds),
+                  style: const TextStyle(
+                      fontSize: 40, fontWeight: FontWeight.bold),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 40), // Abstand zwischen Kreis und Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
@@ -135,8 +179,7 @@ class TimerPageState extends State<TimerPage> {
                 ),
                 const SizedBox(width: 20),
                 ElevatedButton(
-                  onPressed:
-                      _remainingSeconds > 0 || _isPaused ? _resetTimer : null,
+                  onPressed: _resetTimer, // Button ist immer aktiv
                   style: ElevatedButton.styleFrom(
                     fixedSize: const Size(100, 100), // Feste Größe
                     shape: const CircleBorder(), // Runde Form
